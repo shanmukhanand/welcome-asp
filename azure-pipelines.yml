@@ -36,8 +36,18 @@ steps:
     projects: '**/*.csproj'
     arguments: '--configuration Release'
 
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    ArtifactName: 'drop'
-    publishLocation: 'Container'
+# Step 4: Run application in background
+- powershell: |
+    Start-Process "dotnet" "run --project $(Build.SourcesDirectory)\YourProjectFolder\YourProject.csproj --configuration Release --urls http://localhost:5000" -NoNewWindow
+    Start-Sleep -Seconds 10   # wait for the app to start
+  displayName: Run Application (background)
+
+# Step 5: Test the application endpoint
+- powershell: |
+    $response = Invoke-WebRequest -Uri "http://localhost:5000" -UseBasicParsing
+    if ($response.StatusCode -eq 200) {
+        Write-Host "✅ Application is running and returned HTTP 200 OK"
+    } else {
+        Write-Error "❌ Application returned status code $($response.StatusCode)"
+    }
+  displayName: Test Application Endpoint
