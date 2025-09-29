@@ -88,6 +88,10 @@ stages:
     - task: PublishBuildArtifacts@1
       displayName: "Publish Pipeline Artifacts"
       inputs:
-        pathToPublish: '$(Build.ArtifactStagingDirectory)'
-        artifactName: 'drop'
-        publishLocation: 'Container'
+        azureSubscription: 'MyAzureConnection'
+        appType: 'webApp'
+        appName: 'welcome-asp-test'
+        package: '$(Build.ArtifactStagingDirectory)//*.zip'
+#        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+#        artifactName: 'drop'
+#        publishLocation: 'Container'
