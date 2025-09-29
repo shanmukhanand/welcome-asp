@@ -1,49 +1,93 @@
 trigger:
 - main
 
-pool:
-  vmImage: 'windows-2022'
-
 variables:
   solution: '**/*.sln'
   buildPlatform: 'Any CPU'
   buildConfiguration: 'Release'
 
-jobs:
-# Job 1: Install SDK
-- job: install_sdk
-  displayName: "Install .NET SDK"
-  pool:
-    vmImage: 'windows-2022'
-  steps:
-  - task: UseDotNet@2
-    inputs:
-      packageType: 'sdk'
-      version: '8.0.x'    # Use your target .NET version
+stages:
+# ======================
+# Stage 1: Build
+# ======================
+- stage: Build
+  displayName: "Build Stage"
+  jobs:
+  - job: install_sdk
+    displayName: "Install .NET SDK"
+    pool:
+      vmImage: 'windows-2022'
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '8.0.x'    # Use your target .NET version
 
-# Job 2: Restore dependencies
-- job: restore
-  displayName: "Restore Dependencies"
-  dependsOn: install_sdk
-  pool:
-    vmImage: 'windows-2022'
-  steps:
-  - task: DotNetCoreCLI@2
-    displayName: Restore
-    inputs:
-      command: 'restore'
-      projects: '**/*.csproj'
+  - job: restore
+    displayName: "Restore Dependencies"
+    dependsOn: install_sdk
+    pool:
+      vmImage: 'windows-2022'
+    steps:
+    - task: DotNetCoreCLI@2
+      displayName: Restore
+      inputs:
+        command: 'restore'
+        projects: '**/*.csproj'
 
-# Job 3: Build project
-- job: build
-  displayName: "Build Project"
-  dependsOn: restore
-  pool:
-    vmImage: 'windows-2022'
-  steps:
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: 'build'
-      projects: '**/*.csproj'
-      arguments: '--configuration Release'
+  - job: build
+    displayName: "Build Project"
+    dependsOn: restore
+    pool:
+      vmImage: 'windows-2022'
+    steps:
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: 'build'
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration)'
+
+# ======================
+# Stage 2: Test
+# ======================
+- stage: Test
+  displayName: "Test Stage"
+  dependsOn: Build
+  jobs:
+  - job: run_tests
+    displayName: "Run Unit Tests"
+    pool:
+      vmImage: 'windows-2022'
+    steps:
+    - task: DotNetCoreCLI@2
+      displayName: Test
+      inputs:
+        command: 'test'
+        projects: '**/*Tests.csproj'
+        arguments: '--configuration $(buildConfiguration) --no-build'
+
+# ======================
+# Stage 3: Deploy (Artifacts)
+# ======================
+- stage: Deploy
+  displayName: "Deploy Stage"
+  dependsOn: Test
+  jobs:
+  - job: publish_artifacts
+    displayName: "Publish Artifacts"
+    pool:
+      vmImage: 'windows-2022'
+    steps:
+    - task: DotNetCoreCLI@2
+      displayName: Publish
+      inputs:
+        command: 'publish'
+        projects: '**/*.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+    - task: PublishBuildArtifacts@1
+      displayName: "Publish Pipeline Artifacts"
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'drop'
+        publishLocation: 'Container'
