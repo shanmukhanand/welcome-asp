@@ -83,15 +83,14 @@ stages:
       displayName: Publish
       inputs:
         command: 'publish'
+        publishWebProjects: true
         projects: '**/*.csproj'
         arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-    - task: PublishBuildArtifacts@1
-      displayName: "Publish Pipeline Artifacts"
+        zipAfterPublish: true
+    - task: AzureWebApp@1
+      displayName: "Deploy to Azure Web App"
       inputs:
         azureSubscription: 'CelerantConnection'
         appType: 'webApp'
-        appName: 'welcome-asp-test'
+        appName: 'welcome-asp'
         package: '$(Build.ArtifactStagingDirectory)//*.zip'
-#        pathToPublish: '$(Build.ArtifactStagingDirectory)'
-#        artifactName: 'drop'
-#        publishLocation: 'Container'
