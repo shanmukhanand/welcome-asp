@@ -83,10 +83,12 @@ stages:
       displayName: Publish
       inputs:
         command: 'publish'
+        publishWebProjects: true
         projects: '**/*.csproj'
         arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-    - task: PublishBuildArtifacts@1
-      displayName: "Publish Pipeline Artifacts"
+        zipAfterPublish: true
+    - task: AzureWebApp@1
+      displayName: "Deploy to Azure Web App"
       inputs:
         azureSubscription: 'CelerantConnection'
         appType: 'webApp'
