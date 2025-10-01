@@ -6,102 +6,14 @@ variables:
   buildPlatform: 'Any CPU'
   buildConfiguration: 'Release'
 
-stages:
-# ======================
-# Stage 1: Build
-# ======================
-- stage: Build
-  displayName: "Build Stage"
-  jobs:
-  - job: install_sdk
-    displayName: "Install .NET SDK"
-    pool:
-      name: 'Default'
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    - task: UseDotNet@2
-      inputs:
-        packageType: 'sdk'
-        version: '8.0.x'
-
-  - job: restore
-    displayName: "Restore Dependencies"
-    dependsOn: install_sdk
-    pool:
-      name: 'Default'
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Restore
-      inputs:
-        command: 'restore'
-        projects: '**/*.csproj'
-
-  - job: build
-    displayName: "Build Project"
-    dependsOn: restore
-    pool:
-      name: 'Default'
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Build
-      inputs:
-        command: 'build'
-        projects: '**/*.csproj'
-        arguments: '--configuration $(buildConfiguration)'
-
-# ======================
-# Stage 2: Test
-# ======================
-- stage: Test
-  displayName: "Test Stage"
-  dependsOn: Build
-  jobs:
-  - job: run_tests
-    displayName: "Run Unit Tests"
-    pool:
-      name: 'Default'
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Test
-      inputs:
-        command: 'test'
-        projects: '**/*Tests.csproj'
-        arguments: '--configuration $(buildConfiguration) --no-build'
-
-# ======================
-# Stage 3: Deploy (Artifacts)
-# ======================
-- stage: Deploy
-  displayName: "Deploy Stage"
-  dependsOn: Test
-  jobs:
-  - job: publish_artifacts
-    displayName: "Publish Artifacts"
-    pool:
-      name: 'Default'
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Publish
-      inputs:
-        command: 'publish'
-        publishWebProjects: true
-        projects: '**/*.csproj'
-        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-        zipAfterPublish: true
-
-    - task: AzureWebApp@1
-      displayName: "Deploy to Azure Web App"
-      inputs:
-        azureSubscription: 'CelerantConnection'
-        appType: 'webApp'
-        appName: 'welcome-asp'
-        package: '$(Build.ArtifactStagingDirectory)/**/*.zip'
+jobs:
+# Job 1: Install SDK
+- job: install_sdk
+  displayName: "Install .NET SDK"
+  pool:
+    vmImage: 'windows-2022'
+  steps:
+  - task: UseDotNet@2
+    inputs:
+      packageType: 'sdk'
+      version: '8.0.x'    # Use your target .NET version
