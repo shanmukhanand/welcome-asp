@@ -11,7 +11,9 @@ jobs:
 - job: install_sdk
   displayName: "Install .NET SDK"
   pool:
-    vmImage: 'Default'
+    name: 'Default'   # Use Default pool where your self-hosted agent lives
+    demands:
+      - agent.name -equals dotnet-vm-admin
   steps:
   - task: UseDotNet@2
     inputs:
