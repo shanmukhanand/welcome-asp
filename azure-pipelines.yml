@@ -11,7 +11,7 @@ jobs:
 - job: install_sdk
   displayName: "Install .NET SDK"
   pool:
-    vmImage: 'windows-2022'
+    vmImage: 'Default'
   steps:
   - task: UseDotNet@2
     inputs:
