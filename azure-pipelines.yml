@@ -16,18 +16,22 @@ stages:
   - job: install_sdk
     displayName: "Install .NET SDK"
     pool:
-      vmImage: 'windows-2022'
+      name: 'Default'
+      demands:
+        - agent.name -equals dotnet-vm-admin
     steps:
     - task: UseDotNet@2
       inputs:
         packageType: 'sdk'
-        version: '8.0.x'    # Use your target .NET version
+        version: '8.0.x'
 
   - job: restore
     displayName: "Restore Dependencies"
     dependsOn: install_sdk
     pool:
-      vmImage: 'windows-2022'
+      name: 'Default'
+      demands:
+        - agent.name -equals dotnet-vm-admin
     steps:
     - task: DotNetCoreCLI@2
       displayName: Restore
@@ -39,7 +43,9 @@ stages:
     displayName: "Build Project"
     dependsOn: restore
     pool:
-      vmImage: 'windows-2022'
+      name: 'Default'
+      demands:
+        - agent.name -equals dotnet-vm-admin
     steps:
     - task: DotNetCoreCLI@2
       displayName: Build
@@ -58,7 +64,9 @@ stages:
   - job: run_tests
     displayName: "Run Unit Tests"
     pool:
-      vmImage: 'windows-2022'
+      name: 'Default'
+      demands:
+        - agent.name -equals dotnet-vm-admin
     steps:
     - task: DotNetCoreCLI@2
       displayName: Test
@@ -77,7 +85,9 @@ stages:
   - job: publish_artifacts
     displayName: "Publish Artifacts"
     pool:
-      vmImage: 'windows-2022'
+      name: 'Default'
+      demands:
+        - agent.name -equals dotnet-vm-admin
     steps:
     - task: DotNetCoreCLI@2
       displayName: Publish
@@ -87,10 +97,11 @@ stages:
         projects: '**/*.csproj'
         arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
         zipAfterPublish: true
+
     - task: AzureWebApp@1
       displayName: "Deploy to Azure Web App"
       inputs:
         azureSubscription: 'CelerantConnection'
         appType: 'webApp'
         appName: 'welcome-asp'
-        package: '$(Build.ArtifactStagingDirectory)//*.zip'
+        package: '$(Build.ArtifactStagingDirectory)/**/*.zip'
