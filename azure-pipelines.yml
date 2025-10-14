@@ -13,6 +13,20 @@ stages:
 - stage: Build
   displayName: "Build Stage"
   jobs:
+  - job: build_app
+    displayName: "Build ASP.NET Core Project in Docker Agent"
+    pool:
+      name: 'dotnet-agent'           # 👈 your self-hosted pool name
+      demands:
+        - agent.name -equals dotnet-vm-admin
+    steps:
+    # Step 1: Verify Docker agent environment
+    - script: |
+        echo "Running on Docker self-hosted agent..."
+        dotnet --version
+        ls -la
+      displayName: "Verify Agent Environment"
+
   - job: install_sdk
     displayName: "Install .NET SDK"
     pool:
