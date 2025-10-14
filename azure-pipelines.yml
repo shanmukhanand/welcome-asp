@@ -16,9 +16,9 @@ stages:
   - job: build_app
     displayName: "Build ASP.NET Core Project in Docker Agent"
     pool:
-      name: 'dotnet-agent'           # 👈 your self-hosted pool name
+      name: 'Default'           # 👈 your self-hosted pool name
       demands:
-        - agent.name -equals dotnet-agent
+        - agent.name -equals dotnet-vm-admin
     steps:
     # Step 1: Verify Docker agent environment
     - script: |
