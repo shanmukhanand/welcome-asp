@@ -1,121 +1,134 @@
 trigger:
-- main
+  branches:
+    include:
+      - main
 
 variables:
-  solution: '**/*.sln'
-  buildPlatform: 'Any CPU'
-  buildConfiguration: 'Release'
+  - name: solution
+    value: '/*.sln'
+  - name: buildPlatform
+    value: 'Any CPU'
+  - name: buildConfiguration
+    value: 'Release'
+  - name: artifactName
+    value: 'webapp'
 
 stages:
-# ======================
-# Stage 1: Build
-# ======================
+
+# =====================
+# Build Stage
+# =====================
 - stage: Build
   displayName: "Build Stage"
   jobs:
-  - job: build_app
-    displayName: "Build ASP.NET Core Project in Docker Agent"
-    pool:
-      name: 'Default'           # 👈 your self-hosted pool name
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    # Step 1: Verify Docker agent environment
-    - script: |
-        echo "Running on Docker self-hosted agent..."
-        dotnet --version
-        ls -la
-      displayName: "Verify Agent Environment"
+    - job: install_sdk
+      displayName: "Install .NET SDK"
+      pool:
+        name: dotnet-agent   # <-- Self-hosted agent pool
+      steps:
+        - task: UseDotNet@2
+          inputs:
+            packageType: 'sdk'
+            version: '8.0.x'
 
-  - job: install_sdk
-    displayName: "Install .NET SDK"
-    pool:
-      name: 'Default'
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    - task: UseDotNet@2
-      inputs:
-        packageType: 'sdk'
-        version: '8.0.x'
+    - job: restore
+      displayName: "Restore Dependencies"
+      dependsOn:
+        - install_sdk
+      pool:
+        name: dotnet-agent
+      steps:
+        - task: DotNetCoreCLI@2
+          displayName: Restore
+          inputs:
+            command: 'restore'
+            projects: '/*.csproj'
 
-  - job: restore
-    displayName: "Restore Dependencies"
-    dependsOn: install_sdk
-    pool:
-      name: 'Default'
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Restore
-      inputs:
-        command: 'restore'
-        projects: '**/*.csproj'
+    - job: build
+      displayName: "Build Project"
+      dependsOn:
+        - restore
+      pool:
+        name: dotnet-agent
+      steps:
+        - task: DotNetCoreCLI@2
+          displayName: Build
+          inputs:
+            command: 'build'
+            projects: '/*.csproj'
+            arguments: '--configuration $(buildConfiguration)'
 
-  - job: build
-    displayName: "Build Project"
-    dependsOn: restore
-    pool:
-      name: 'Default'
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Build
-      inputs:
-        command: 'build'
-        projects: '**/*.csproj'
-        arguments: '--configuration $(buildConfiguration)'
-
-# ======================
-# Stage 2: Test
-# ======================
+# =====================
+# Test Stage
+# =====================
 - stage: Test
   displayName: "Test Stage"
-  dependsOn: Build
+  dependsOn:
+    - Build
   jobs:
-  - job: run_tests
-    displayName: "Run Unit Tests"
-    pool:
-      name: 'Default'
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Test
-      inputs:
-        command: 'test'
-        projects: '**/*Tests.csproj'
-        arguments: '--configuration $(buildConfiguration) --no-build'
+    - job: run_tests
+      displayName: "Run Unit Tests"
+      pool:
+        name: dotnet-agent
+      steps:
+        - task: DotNetCoreCLI@2
+          displayName: Test
+          inputs:
+            command: 'test'
+            projects: '/*Tests.csproj'
+            arguments: '--configuration $(buildConfiguration) --no-build'
 
-# ======================
-# Stage 3: Deploy (Artifacts)
-# ======================
+# =====================
+# Deploy Stage
+# =====================
 - stage: Deploy
   displayName: "Deploy Stage"
-  dependsOn: Test
+  dependsOn:
+    - Test
   jobs:
-  - job: publish_artifacts
-    displayName: "Publish Artifacts"
-    pool:
-      name: 'Default'
-      demands:
-        - agent.name -equals dotnet-vm-admin
-    steps:
-    - task: DotNetCoreCLI@2
-      displayName: Publish
-      inputs:
-        command: 'publish'
-        publishWebProjects: true
-        projects: '**/*.csproj'
-        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-        zipAfterPublish: true
+    - job: publish_artifacts
+      displayName: "Publish Artifacts"
+      pool:
+        name: dotnet-agent
+      steps:
+        # Publish the web app
+        - task: DotNetCoreCLI@2
+          displayName: Publish
+          inputs:
+            command: 'publish'
+            projects: '/*.csproj'
+            arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
 
-    - task: AzureWebApp@1
-      displayName: "Deploy to Azure Web App"
-      inputs:
-        azureSubscription: 'CelerantConnection'
-        appType: 'webApp'
-        appName: 'welcome-asp'
-        package: '$(Build.ArtifactStagingDirectory)/**/*.zip'
+        # Publish pipeline artifacts
+        - task: PublishBuildArtifacts@1
+          displayName: "Publish Pipeline Artifacts"
+          inputs:
+            artifactName: $(artifactName)
+            targetPath: '$(Build.ArtifactStagingDirectory)'
+
+        # =====================
+        # Deploy to Azure VM using WinRM/SSH
+        # =====================
+        - task: CopyFilesOverSSH@0
+          displayName: "Copy files to Azure VM"
+          inputs:
+            sshEndpoint: 'MyVM-SSH-ServiceConnection'
+            sourceFolder: '$(Build.ArtifactStagingDirectory)'
+            targetFolder: 'C:\inetpub\wwwroot\mywebsite'
+            cleanTargetFolder: true
+
+        - task: IISWebAppManagementOnMachineGroup@0
+          displayName: "Restart IIS Website"
+          inputs:
+            Action: 'Start IIS Website'
+            WebSiteName: 'Default Web Site'
+
+        # =====================
+        # Optional: Deploy as Docker container
+        # =====================
+        #- script: |
+        #    docker stop mywebsite || true
+        #    docker rm mywebsite || true
+        #    docker build -t mywebsite:latest $(Build.ArtifactStagingDirectory)
+        #    docker run -d -p 80:80 --name mywebsite mywebsite:latest
+        #  displayName: "Build and run web app in Docker container"
